@@ -75,4 +75,20 @@ class FixerAgent(BaseAgent):
         # Clean and validate the output
         fixed_code = self._sanitize_output(response.content)
         
+        # Persistence: Write the improved code to the disk
+        write_file(file_path, fixed_code)
+
+        # Mandatory Experiment Logging
+        log_experiment(
+            agent_name=self.agent_name,
+            model_used=self.model_name,
+            action=ActionType.FIX,
+            details={
+                "file_fixed": os.path.basename(file_path),
+                "plan_length": len(plan),
+                "success_status": "applied_to_filesystem"
+            },
+            status="SUCCESS"
+        )
+        
         return fixed_code
