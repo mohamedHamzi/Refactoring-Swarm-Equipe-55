@@ -33,3 +33,46 @@ class FixerAgent(BaseAgent):
             code = code[:-3]
         
         return code.strip()
+    
+    def fix(self, file_path: str, code_content: str, plan: str, error_context: Optional[str] = None) -> str:
+        """
+        Analyzes code and applies the refactoring plan using structured prompt engineering.
+        """
+        
+        system_prompt = (
+            "You are a Senior Python Expert Developer (The Fixer).\n"
+            "Your mission is to rewrite the provided Python code based on a specific plan.\n\n"
+            "CRITICAL RULES:\n"
+            "1. Output ONLY valid, runnable Python code.\n"
+            "2. Never include markdown backticks (```) or conversational text.\n"
+            "3. Ensure the code is production-ready and maintains existing functionality unless the plan states otherwise.\n"
+            "4. Follow the provided plan exactly."
+        )
+
+        # Escaping curly braces to prevent LangChain parsing issues
+        escaped_code = code_content.replace("{", "{{").replace("}", "}}")
+        escaped_plan = plan.replace("{", "{{").replace("}", "}}")
+
+        user_message = (
+            f"TARGET FILE: {os.path.basename(file_path)}\n\n"
+            f"### ORIGINAL SOURCE CODE ###\n{escaped_code}\n\n"
+            f"### REFACTORING PLAN ###\n{escaped_plan}"
+        )
+
+        if error_context:
+            escaped_error = error_context.replace("{", "{{").replace("}", "}}")
+            user_message += f"\n\n### PREVIOUS ERRORS TO RESOLVE ###\n{escaped_error}"
+
+        prompt = ChatPromptTemplate.from_messages([
+            ("system", system_prompt),
+            ("user", user_message)
+        ])
+
+        # Execution via LangChain
+        chain = prompt | self.llm
+        response = self.invoke_with_delay(chain, {})
+        
+        # Clean and validate the output
+        fixed_code = self._sanitize_output(response.content)
+        
+        return fixed_code
