@@ -39,7 +39,7 @@ def main():
             "pylint_score": 0.0,
             "test_results": {},
             "iterations": 0,
-            "max_iterations": 5, # As per requirements (max 10, let's be safe with 5)
+            "max_iterations": 10, 
             "error_context": "",
             "status": "START"
         }
