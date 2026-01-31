@@ -1,3 +1,4 @@
+.*python_version
 # .gitignore
 __pycache__/
 *.pyc
@@ -16,3 +17,5 @@ sandbox/
 logs/*
 # ...SAUF le fichier de données final qu'on veut récupérer
 !logs/experiment_data.json
+Doc*
+

@@ -33,6 +33,11 @@ def run_pytest(test_dir: str) -> dict:
         output = result.stdout + "\n" + result.stderr
         success = result.returncode == 0
         
+        # Handle specific pytest exit codes
+        if result.returncode == 5:
+            output += "\n\nNO TESTS FOUND: Pytest exit code 5. functionality needs to be tested."
+            success = False
+        
         # NEW: Parse test counts from output
         tests_passed = len(re.findall(r'PASSED', output))
         tests_failed = len(re.findall(r'FAILED', output))
@@ -95,12 +100,14 @@ def extract_test_failures(output: str) -> str:
     # Look for FAILED section with details
     failure_section = re.search(r'(FAILED.*?)(?:=+\s+|$)', output, re.DOTALL)
     if failure_section:
-        return failure_section.group(1)
+        content = failure_section.group(1)
+        return content[:2000] + "\n...(truncated)" if len(content) > 2000 else content
     
     # Look for ERROR section
     error_section = re.search(r'(ERROR.*?)(?:=+\s+|$)', output, re.DOTALL)
     if error_section:
-        return error_section.group(1)
+        content = error_section.group(1)
+        return content[:2000] + "\n...(truncated)" if len(content) > 2000 else content
     
     # Fallback: return last part of output (likely contains errors)
     return output[-1000:] if len(output) > 1000 else output

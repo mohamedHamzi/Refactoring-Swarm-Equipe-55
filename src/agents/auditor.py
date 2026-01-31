@@ -58,13 +58,15 @@ For each file, identify issues in these categories (include only relevant ones):
 - Code Smells / Refactoring Opportunities: Duplication, long functions, poor naming, complex conditionals, etc.
 - Style & Convention Violations: PEP 8 issues not caught or emphasized by Pylint.
 - Documentation: Missing/incomplete docstrings, type hints, module/class/function comments.
-- Testing: Absence of tests, or suggestions for key test cases needed (specify functions/classes to test and what to cover).
+- Testing: Absence of tests is a CRITICAL ISSUE.
+  - If no tests exist, you MUST explicitly instruct the Fixer to create a NEW test file (e.g., `test_<filename>.py`).
+  - Provide a list of test cases that need to be implemented.
 - Security / Best Practices: Unsafe functions, hardcoded secrets, poor error handling, etc.
 - Performance: Inefficient algorithms or patterns.
 
-
-
-This structured plan will be passed directly to the Fixer. Make it complete and clear to minimize iterations.
+### Output Format for Fixer
+The Fixer now expects to output multiple files in JSON format.
+Your plan MUST explicitly state: "Create a new file named `test_<filename>.py` containing unit tests..." alongside the refactored code instructions.
         """
         
         # Optimize Pylint output to save tokens
