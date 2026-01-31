@@ -70,7 +70,7 @@ class FixerAgent(BaseAgent):
             "3. If the code contains invalid syntax, fix it.\n"
             "4. Ensure the code is production-ready and maintains existing functionality unless the plan states otherwise.\n"
             "5. Follow the provided plan exactly. If the plan asks for tests, create a separate test file.\n"
-            
+            "6. Pay close attention to 'PREVIOUS ERRORS'. If Pylint errors are reported, you MUST fix them to achieve a perfect 10/10 score.\n"
         )
 
         # Escaping curly braces to prevent LangChain parsing issues
@@ -102,9 +102,16 @@ class FixerAgent(BaseAgent):
         try:
             files_to_write = json.loads(cleaned_response)
         except json.JSONDecodeError:
-            # Fallback for legacy single-file output or malformed JSON
-            print("⚠️ Warning: LLM did not return valid JSON. Assuming single file output.")
-            files_to_write = {os.path.basename(file_path): cleaned_response}
+            try:
+                # Fallback: Try parsing as a Python dictionary (common with LLMs generating Python code)
+                import ast
+                files_to_write = ast.literal_eval(cleaned_response)
+                if not isinstance(files_to_write, dict):
+                    raise ValueError("Parsed content is not a dictionary")
+            except (ValueError, SyntaxError):
+                # Fallback for legacy single-file output or malformed structure
+                print("⚠️ Warning: LLM did not return valid JSON. Assuming single file output.")
+                files_to_write = {os.path.basename(file_path): cleaned_response}
         
         final_main_code = ""
         
@@ -121,6 +128,10 @@ class FixerAgent(BaseAgent):
             if filename == os.path.basename(file_path):
                 final_main_code = content
 
+        # Calculate Pylint score for the fixed file
+        from src.tools.linting import run_pylint
+        pylint_results = run_pylint(file_path)
+        
         # Mandatory Experiment Logging
         log_experiment(
             agent_name=self.agent_name,
@@ -131,8 +142,9 @@ class FixerAgent(BaseAgent):
                 "files_created": list(files_to_write.keys()),
                 "plan_length": len(plan),
                 "success_status": "applied_to_filesystem",
-                "input_prompt": system_prompt + "\n\n" + user_message, # FIXED: Added mandatory field
-                "output_response": cleaned_response # FIXED: Added mandatory field
+                "input_prompt": system_prompt + "\n\n" + user_message,
+                "output_response": cleaned_response,
+                "pylint_score": pylint_results.get('score', 0.0)
             },
             status="SUCCESS"
         )

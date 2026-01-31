@@ -9,6 +9,7 @@ from src.agents.fixer import FixerAgent
 from src.agents.judge import JudgeAgent
 from src.utils.logger import log_experiment, ActionType
 from src.config import DEFAULT_MODEL_NAME
+from src.tools.linting import run_pylint
 
 
 # Define the state of the graph
@@ -50,9 +51,13 @@ def fixer_node(state: AgentState, model_name: str = DEFAULT_MODEL_NAME):
         error_context=error_ctx
     )
     
+    # Update Pylint Score immediately after fix
+    lint_res = run_pylint(state['target_file'])
+    
     return {
         "current_code": fixed_code,
-        "iterations": state["iterations"] + 1
+        "iterations": state["iterations"] + 1,
+        "pylint_score": lint_res.get('score', 0.0)
     }
 
 def judge_node(state: AgentState):
@@ -66,10 +71,41 @@ def judge_node(state: AgentState):
     target_dir = os.path.dirname(state['target_file'])
     results = judge.evaluate(target_dir)
     
+    status = "SUCCESS" if results['success'] else "FAILURE"
+    error_context = results['output'] if not results['success'] else None
+    
+    # Quality Gate: Check Pylint Score if tests pass
+    if results['success']:
+        current_score = state.get('pylint_score', 0.0)
+        TARGET_SCORE = 9.5
+        
+        if current_score < TARGET_SCORE:
+            print(f"⚠️ Tests passed, but Pylint Score {current_score} < {TARGET_SCORE}. Rejecting.")
+            status = "FAILURE"
+            
+            # Fetch detailed report to guide the Fixer
+            lint_res = run_pylint(state['target_file'])
+            issues = lint_res.get('issues', [])
+            
+            # Format top issues for the agent
+            formatted_issues = []
+            for issue in issues[:15]:
+                formatted_issues.append(f"Line {issue.get('line')}: {issue.get('message')} ({issue.get('symbol')})")
+            
+            report = "\n".join(formatted_issues)
+            if len(issues) > 15:
+                report += f"\n... and {len(issues) - 15} more."
+            
+            error_context = (
+                f"Tests passed, but Pylint score is too low ({current_score}/10). Goal is {TARGET_SCORE}.\n"
+                "CRITICAL: You MUST fix the following linting errors:\n\n"
+                f"{report}"
+            )
+
     return {
         "test_results": results,
-        "status": "SUCCESS" if results['success'] else "FAILURE",
-        "error_context": results['output'] if not results['success'] else None
+        "status": status,
+        "error_context": error_context
     }
 
 # Edge Logic

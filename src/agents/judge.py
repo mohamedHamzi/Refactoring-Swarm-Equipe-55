@@ -54,6 +54,7 @@ class JudgeAgent:
                 "tests_passed": results.get("tests_passed", 0),
                 "tests_failed": results.get("tests_failed", 0),
                 "tests_error": results.get("tests_error", 0),
+                "pylint_score": pylint_results.get('score', 0.0),
                 "duration": results.get("duration", 0.0)
             },
             status=status
