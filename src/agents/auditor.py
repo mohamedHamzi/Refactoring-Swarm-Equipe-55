@@ -29,6 +29,7 @@ class AuditorAgent(BaseAgent):
         2. Improving code style and following PEP 8.
         3. Adding missing docstrings and type hints.
         4. Removing unused code.
+        5. Handling edge cases (e.g., division by zero should raise an appropriate error).
         
         Return ONLY the plan as a numbered list.
         """
