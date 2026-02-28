@@ -10,7 +10,8 @@ def run_pytest(test_dir: str) -> dict:
     if not os.path.exists(test_dir):
         return {
             "success": False,
-            "output": f"Test directory not found: {test_dir}"
+            "output": f"Test directory not found: {test_dir}",
+            "error_type": "ENVIRONMENT_ERROR"
         }
 
     try:
@@ -19,7 +20,8 @@ def run_pytest(test_dir: str) -> dict:
             [sys.executable, "-m", "pytest", test_dir, "-v", "--tb=short"],
             capture_output=True,
             text=True,
-            check=False
+            check=False,
+            timeout=120  # 2-minute timeout to prevent hangs
         )
 
         success = result.returncode == 0
@@ -28,13 +30,21 @@ def run_pytest(test_dir: str) -> dict:
             "success": success,
             "output": result.stdout + "\n" + result.stderr
         }
+    except subprocess.TimeoutExpired:
+        return {
+            "success": False,
+            "output": "TIMEOUT: Pytest exceeded 120-second time limit.",
+            "error_type": "TIMEOUT"
+        }
     except FileNotFoundError:
         return {
             "success": False,
-            "output": "Python executable not found. Ensure Python is installed correctly."
+            "output": "Python executable not found. Ensure Python is installed correctly.",
+            "error_type": "ENVIRONMENT_ERROR"
         }
     except Exception as e:
         return {
             "success": False,
-            "output": f"Error running pytest: {e}"
+            "output": f"Error running pytest: {e}",
+            "error_type": "ENVIRONMENT_ERROR" if "WinError" in str(e) or "FileNotFoundError" in str(e) else "UNKNOWN"
         }

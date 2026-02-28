@@ -64,7 +64,7 @@ class FixerAgent(BaseAgent):
         
         return test_code
 
-    def fix(self, file_path: str, code_content: str, plan: str, error_context: str = None):
+    def fix(self, file_path: str, code_content: str, plan: str, error_context: str = None, iteration: int = None):
         """
         Applies fixes to the code based on the implementation plan and optional error context.
         Also generates a test file for the fixed code.
@@ -135,7 +135,8 @@ class FixerAgent(BaseAgent):
                     "output_response": test_code,
                     "source_file": filename
                 },
-                status="SUCCESS"
+                status="SUCCESS",
+                iteration=iteration
             )
         
         # LOGGING (MANDATORY)
@@ -149,7 +150,8 @@ class FixerAgent(BaseAgent):
                 "output_response": fixed_code,
                 "plan_followed": plan
             },
-            status="SUCCESS"
+            status="SUCCESS",
+            iteration=iteration
         )
         
         return fixed_code

@@ -27,54 +27,65 @@ class AgentState(TypedDict):
 def auditor_node(state: AgentState, model_name: str = DEFAULT_MODEL_NAME):
     print(f"--- Auditor Node: {state['target_file']} ---")
     auditor = AuditorAgent(model_name=model_name)
-    result = auditor.analyze(state['target_file'])
+    result = auditor.analyze(state['target_file'], iteration=state.get("iterations", 0))
     
     return {
         "refactoring_plan": result['plan'],
         "pylint_score": result['pylint_score'],
         "current_code": result['original_code'],
-        "iterations": state.get("iterations", 0) + 1,
-        "error_context": None # Reset error context on fresh analysis/plan
+        "error_context": None  # Reset error context on fresh analysis/plan
     }
 
 def fixer_node(state: AgentState, model_name: str = DEFAULT_MODEL_NAME):
-    print(f"--- Fixer Node: Iteration {state['iterations']} ---")
+    iteration = state["iterations"] + 1
+    print(f"--- Fixer Node: Iteration {iteration} ---")
     fixer = FixerAgent(model_name=model_name)
-    # If we have an error context from a previous failed test, pass it
     error_ctx = state.get("error_context")
     
     fixed_code = fixer.fix(
         state['target_file'], 
         state['current_code'], 
         state['refactoring_plan'],
-        error_context=error_ctx
+        error_context=error_ctx,
+        iteration=iteration
     )
     
     return {
         "current_code": fixed_code,
-        "iterations": state["iterations"] + 1
+        "iterations": iteration
     }
 
 def judge_node(state: AgentState):
     print("--- Judge Node ---")
     judge = JudgeAgent()
-    # Judge tests the directory containing the file. 
-    # Since we are in a monorepo setup, we might want to test the specific test folder or the whole project.
-    # For this exercise, let's assume the tests are in the target directory or we run all tests.
-    # We'll run pytest on the directory of the target file.
-    
     target_dir = os.path.dirname(state['target_file'])
-    results = judge.evaluate(target_dir)
+    results = judge.evaluate(target_dir, iteration=state.get("iterations", 0))
+    
+    # Determine status — environment errors get special treatment
+    error_type = results.get("error_type")
+    if results['success']:
+        status = "SUCCESS"
+    elif error_type == "ENVIRONMENT_ERROR":
+        status = "ENVIRONMENT_ERROR"
+    elif error_type == "TIMEOUT":
+        status = "ENVIRONMENT_ERROR"
+    else:
+        status = "FAILURE"
     
     return {
         "test_results": results,
-        "status": "SUCCESS" if results['success'] else "FAILURE",
+        "status": status,
         "error_context": results['output'] if not results['success'] else None
     }
 
 # Edge Logic
 def check_status(state: AgentState):
     if state['status'] == "SUCCESS":
+        return "end"
+    
+    # Stop immediately on environment errors — retrying won't help
+    if state['status'] == "ENVIRONMENT_ERROR":
+        print("⚠️ Environment error detected. Stopping loop — retrying won't fix infrastructure issues.")
         return "end"
     
     if state['iterations'] >= state['max_iterations']:
@@ -87,10 +98,6 @@ def check_status(state: AgentState):
 def create_graph(model_name: str = DEFAULT_MODEL_NAME):
     workflow = StateGraph(AgentState)
     
-    # We need to use partials or lambdas to pass configuration if we want dynamic model injection
-    # But LangGraph nodes usually take 'state'. 
-    # A cleaner way in LangGraph is to put configuration in the state or use partials.
-    # Let's use partials for simplicity here since we build the graph once.
     from functools import partial
     
     workflow.add_node("auditor", partial(auditor_node, model_name=model_name))
@@ -107,7 +114,7 @@ def create_graph(model_name: str = DEFAULT_MODEL_NAME):
         check_status,
         {
             "end": END,
-            "fix_again": "fixer" # Loop back to fixer with error context
+            "fix_again": "fixer"  # Loop back to fixer with error context
         }
     )
     

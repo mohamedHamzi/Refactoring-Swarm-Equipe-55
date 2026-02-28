@@ -13,7 +13,7 @@ class AuditorAgent(BaseAgent):
         super().__init__(model_name)
         self.agent_name = "Auditor_Agent"
 
-    def analyze(self, file_path: str):
+    def analyze(self, file_path: str, iteration: int = None):
         """
         Analyzes the code using Pylint and an LLM to produce a refactoring plan.
         """
@@ -37,19 +37,15 @@ class AuditorAgent(BaseAgent):
         # Optimize Pylint output to save tokens
         issues = pylint_results.get('issues', [])
         if issues and isinstance(issues, list):
-            # Sort by severity/importance if possible, or just take first N
-            # Limit to top 15 issues to save context
             limited_issues = issues[:15]
             
             pylint_summary = f"Total issues: {len(issues)}. Showing top {len(limited_issues)}:\n"
             for issue in limited_issues:
-                # Format: line:col [type] message (symbol)
                 pylint_summary += f"Line {issue.get('line')}:{issue.get('column')} [{issue.get('type')}] {issue.get('message')} ({issue.get('symbol')})\n"
                 
             if len(issues) > 15:
                 pylint_summary += f"... and {len(issues) - 15} more issues."
         else:
-            # Fallback to truncated raw output if structure is missing
             raw_output = pylint_results.get('output', '')
             pylint_summary = raw_output[:2000] + "\n...(truncated)" if len(raw_output) > 2000 else raw_output
 
@@ -89,7 +85,8 @@ class AuditorAgent(BaseAgent):
                 "output_response": refactoring_plan,
                 "pylint_score": pylint_results['score']
             },
-            status="SUCCESS"
+            status="SUCCESS",
+            iteration=iteration
         )
         
         return {

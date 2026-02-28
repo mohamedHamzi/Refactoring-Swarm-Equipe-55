@@ -4,7 +4,7 @@ import os
 from dotenv import load_dotenv
 from src.utils.logger import log_experiment
 from src.graph import create_graph
-from src.tools.files import list_files
+from src.tools.files import list_files, set_sandbox_dir
 
 load_dotenv()
 
@@ -17,8 +17,10 @@ def main():
         print(f"❌ Dossier {args.target_dir} introuvable.")
         sys.exit(1)
 
+    # Initialize sandbox protection — all file ops locked to this directory
+    set_sandbox_dir(args.target_dir)
+
     print(f"🚀 DEMARRAGE SUR : {args.target_dir}")
-    # log_experiment("System", "STARTUP", "START", {"target": args.target_dir, "input_prompt": "START", "output_response": "STARTED"}, "INFO")
 
     # Initialize Graph
     from src.config import DEFAULT_MODEL_NAME
@@ -27,7 +29,7 @@ def main():
     
     # Find python files to refactor
     all_files = list_files(args.target_dir)
-    py_files = [f for f in all_files if f.endswith(".py") and "test" not in os.path.basename(f).lower()] # Exclude test files from being refactored directly for now
+    py_files = [f for f in all_files if f.endswith(".py") and "test" not in os.path.basename(f).lower()]
     
     for py_file in py_files:
         print(f"\nProcessing file: {py_file}")
